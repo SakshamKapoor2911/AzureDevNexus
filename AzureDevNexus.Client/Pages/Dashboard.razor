@@ -1,0 +1,450 @@
+@page "/dashboard"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - Dashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2">Dashboard</h1>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" @onclick="RefreshDashboard">
+                        <i class="oi oi-reload"></i> Refresh
+                    </button>
+                    <small class="text-muted align-self-center">
+                        Last updated: @(dashboardMetrics?.LastUpdated.ToString("MMM dd, HH:mm") ?? "Never")
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Key Metrics Cards -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Projects</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">@(dashboardMetrics?.TotalProjects ?? 0)</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="oi oi-briefcase fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Active Pipelines</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">@(dashboardMetrics?.TotalPipelines ?? 0)</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="oi oi-graph fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Open Work Items</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">@(dashboardMetrics?.OpenWorkItems ?? 0)</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="oi oi-task fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Active Users</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">@(dashboardMetrics?.ActiveUsers ?? 0)</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="oi oi-people fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Analytics Row -->
+        <div class="row mb-4">
+            <div class="col-xl-8 col-lg-7">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Pipeline Success Rate</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-area">
+                            <canvas id="pipelineChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4 col-lg-5">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Project Distribution</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-pie">
+                            <canvas id="projectChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Metrics Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Project Performance Overview</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th>Pipelines</th>
+                                        <th>Repositories</th>
+                                        <th>Work Items</th>
+                                        <th>Success Rate</th>
+                                        <th>Last Activity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (projectMetrics != null)
+                                    {
+                                        @foreach (var project in projectMetrics)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-bold">@project.ProjectName</div>
+                                                </td>
+                                                <td>@project.PipelineCount</td>
+                                                <td>@project.RepositoryCount</td>
+                                                <td>
+                                                    <span class="badge bg-primary">@project.ActiveWorkItems Active</span>
+                                                    <span class="badge bg-success">@project.CompletedWorkItems Completed</span>
+                                                </td>
+                                                <td>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar @GetSuccessRateColor(project.PipelineSuccessRate)" 
+                                                             style="width: @(project.PipelineSuccessRate)%">
+                                                            @(project.PipelineSuccessRate.ToString("F1"))%
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>@project.LastActivity.ToString("MMM dd, HH:mm")</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity and Pipeline Status -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Recent Activity</h6>
+                    </div>
+                    <div class="card-body">
+                        @if (recentActivities != null && recentActivities.Any())
+                        {
+                            <div class="timeline">
+                                @foreach (var activity in recentActivities.Take(8))
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker @GetActivityMarkerClass(activity.Type)"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="timeline-title">@activity.Title</h6>
+                                            <p class="timeline-text">@activity.Description</p>
+                                            <div class="timeline-meta">
+                                                <small class="text-muted">
+                                                    <i class="oi oi-person"></i> @activity.User
+                                                    <i class="oi oi-clock ms-2"></i> @activity.Timestamp.ToString("MMM dd, HH:mm")
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No recent activity to display.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Pipeline Status</h6>
+                    </div>
+                    <div class="card-body">
+                        @if (pipelineMetrics != null && pipelineMetrics.Any())
+                        {
+                            @foreach (var pipeline in pipelineMetrics.Take(6))
+                            {
+                                <div class="pipeline-status-item mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <h6 class="mb-0">@pipeline.PipelineName</h6>
+                                        <span class="badge @GetPipelineStatusBadgeClass(pipeline.SuccessRate)">
+                                            @(pipeline.SuccessRate.ToString("F1"))%
+                                        </span>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 8px;">
+                                        <div class="progress-bar @GetSuccessRateColor(pipeline.SuccessRate)" 
+                                             style="width: @(pipeline.SuccessRate)%"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between text-muted small">
+                                        <span>@pipeline.TotalRuns runs</span>
+                                        <span>Last: @pipeline.LastRun.ToString("MMM dd")</span>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No pipeline data available.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardMetrics? dashboardMetrics;
+    private List<ProjectMetrics>? projectMetrics;
+    private List<PipelineMetrics>? pipelineMetrics;
+    private List<RecentActivity>? recentActivities;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isLoading)
+        {
+            await InitializeCharts();
+        }
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(1000);
+            
+            // Load dashboard metrics
+            dashboardMetrics = new DashboardMetrics
+            {
+                TotalProjects = 3,
+                ActiveProjects = 3,
+                TotalPipelines = 8,
+                FailedPipelineRuns = 2,
+                TotalWorkItems = 45,
+                OpenWorkItems = 23,
+                TotalRepositories = 5,
+                ActiveUsers = 12,
+                LastUpdated = DateTime.UtcNow
+            };
+
+            // Load project metrics
+            projectMetrics = new List<ProjectMetrics>
+            {
+                new()
+                {
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    PipelineCount = 5,
+                    RepositoryCount = 3,
+                    WorkItemCount = 25,
+                    ActiveWorkItems = 15,
+                    CompletedWorkItems = 10,
+                    PipelineSuccessRate = 92.5,
+                    LastActivity = DateTime.UtcNow.AddHours(-1)
+                },
+                new()
+                {
+                    ProjectId = "proj-002",
+                    ProjectName = "E-Commerce Platform",
+                    PipelineCount = 3,
+                    RepositoryCount = 2,
+                    WorkItemCount = 20,
+                    ActiveWorkItems = 8,
+                    CompletedWorkItems = 12,
+                    PipelineSuccessRate = 87.3,
+                    LastActivity = DateTime.UtcNow.AddHours(-3)
+                }
+            };
+
+            // Load pipeline metrics
+            pipelineMetrics = new List<PipelineMetrics>
+            {
+                new()
+                {
+                    PipelineId = "pipe-001",
+                    PipelineName = "Build Pipeline",
+                    TotalRuns = 45,
+                    SuccessfulRuns = 42,
+                    FailedRuns = 3,
+                    CancelledRuns = 0,
+                    SuccessRate = 93.3,
+                    AverageDuration = TimeSpan.FromMinutes(8),
+                    LastRun = DateTime.UtcNow.AddHours(-2)
+                },
+                new()
+                {
+                    PipelineId = "pipe-002",
+                    PipelineName = "Deploy Pipeline",
+                    TotalRuns = 23,
+                    SuccessfulRuns = 20,
+                    FailedRuns = 2,
+                    CancelledRuns = 1,
+                    SuccessRate = 87.0,
+                    AverageDuration = TimeSpan.FromMinutes(15),
+                    LastRun = DateTime.UtcNow.AddHours(-1)
+                }
+            };
+
+            // Load recent activities
+            recentActivities = new List<RecentActivity>
+            {
+                new()
+                {
+                    Id = "act-001",
+                    Type = "PipelineRun",
+                    Title = "Build Pipeline Completed",
+                    Description = "Build #123 completed successfully",
+                    User = "system",
+                    Timestamp = DateTime.UtcNow.AddMinutes(-30),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Status = "Completed"
+                },
+                new()
+                {
+                    Id = "act-002",
+                    Type = "WorkItem",
+                    Title = "Work Item Updated",
+                    Description = "Task 'Implement Dashboard' moved to Active",
+                    User = "developer@company.com",
+                    Timestamp = DateTime.UtcNow.AddHours(-1),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Status = "Active"
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshDashboard()
+    {
+        await LoadDashboardData();
+        if (!isLoading)
+        {
+            await InitializeCharts();
+        }
+    }
+
+    private async Task InitializeCharts()
+    {
+        // Initialize charts using Chart.js or similar library
+        // This is a placeholder for chart initialization
+        await Task.CompletedTask;
+    }
+
+    private string GetSuccessRateColor(double successRate)
+    {
+        return successRate switch
+        {
+            >= 90 => "bg-success",
+            >= 75 => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+
+    private string GetPipelineStatusBadgeClass(double successRate)
+    {
+        return successRate switch
+        {
+            >= 90 => "bg-success",
+            >= 75 => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+
+    private string GetActivityMarkerClass(string activityType)
+    {
+        return activityType.ToLower() switch
+        {
+            "pipelinerun" => "bg-success",
+            "workitem" => "bg-primary",
+            "repository" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+}

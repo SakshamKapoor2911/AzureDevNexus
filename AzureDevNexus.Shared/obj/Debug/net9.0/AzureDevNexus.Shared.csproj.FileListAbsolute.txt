@@ -1,0 +1,12 @@
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.AssemblyInfoInputs.cache
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.AssemblyInfo.cs
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.sourcelink.json
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\bin\Debug\net9.0\AzureDevNexus.Shared.deps.json
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\bin\Debug\net9.0\AzureDevNexus.Shared.dll
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\bin\Debug\net9.0\AzureDevNexus.Shared.pdb
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.dll
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\refint\AzureDevNexus.Shared.dll
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\AzureDevNexus.Shared.pdb
+C:\Users\Saksham Kapoor\Desktop\FAANG SWE\AzureDevNexus\AzureDevNexus.Shared\obj\Debug\net9.0\ref\AzureDevNexus.Shared.dll

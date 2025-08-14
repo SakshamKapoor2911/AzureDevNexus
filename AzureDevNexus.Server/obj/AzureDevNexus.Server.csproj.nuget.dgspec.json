@@ -72,6 +72,10 @@
               "target": "Package",
               "version": "[19.225.1, )"
             },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[9.0.3, )"
+            },
             "xunit": {
               "target": "Package",
               "version": "[2.9.3, )"

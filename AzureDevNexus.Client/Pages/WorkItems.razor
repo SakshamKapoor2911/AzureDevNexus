@@ -1,0 +1,332 @@
+@page "/workitems"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - Work Items</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2">Work Items</h1>
+                <div class="d-flex gap-2">
+                    <div class="input-group" style="width: 300px;">
+                        <span class="input-group-text">
+                            <i class="oi oi-magnifying-glass"></i>
+                        </span>
+                        <input type="text" class="form-control" placeholder="Search work items..." 
+                               @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    </div>
+                    <select class="form-select" style="width: 150px;" @bind="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="Bug">Bug</option>
+                        <option value="Task">Task</option>
+                        <option value="User Story">User Story</option>
+                        <option value="Feature">Feature</option>
+                        <option value="Epic">Epic</option>
+                    </select>
+                    <select class="form-select" style="width: 150px;" @bind="stateFilter">
+                        <option value="">All States</option>
+                        <option value="New">New</option>
+                        <option value="Active">Active</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Removed">Removed</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="RefreshWorkItems">
+                        <i class="oi oi-reload"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    }
+    else if (filteredWorkItems != null && filteredWorkItems.Any())
+    {
+        <div class="row">
+            @foreach (var workItem in filteredWorkItems)
+            {
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 workitem-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0">@workItem.Title</h5>
+                                <small class="text-muted">@workItem.ProjectName</small>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge @GetTypeBadgeClass(workItem.Type)">@workItem.Type</span>
+                                <span class="badge @GetStateBadgeClass(workItem.State)">@workItem.State</span>
+                                @if (!string.IsNullOrEmpty(workItem.Priority))
+                                {
+                                    <span class="badge @GetPriorityBadgeClass(workItem.Priority)">@workItem.Priority</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted">@(workItem.Description.Length > 150 ? workItem.Description.Substring(0, 150) + "..." : workItem.Description)</p>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted">Assigned To:</small>
+                                    <div class="fw-bold">@(string.IsNullOrEmpty(workItem.AssignedTo) ? "Unassigned" : workItem.AssignedTo)</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Created:</small>
+                                    <div class="fw-bold">@workItem.CreatedDate.ToString("MMM dd, yyyy")</div>
+                                </div>
+                            </div>
+
+                            @if (workItem.Tags.Any())
+                            {
+                                <div class="mb-3">
+                                    <small class="text-muted">Tags:</small>
+                                    <div class="d-flex gap-1 mt-1 flex-wrap">
+                                        @foreach (var tag in workItem.Tags.Take(5))
+                                        {
+                                            <span class="badge bg-light text-dark">@tag</span>
+                                        }
+                                        @if (workItem.Tags.Count > 5)
+                                        {
+                                            <span class="badge bg-secondary">+@(workItem.Tags.Count - 5) more</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="oi oi-map-marker"></i> @workItem.AreaPath
+                                </small>
+                                <small class="text-muted">
+                                    <i class="oi oi-calendar"></i> @workItem.IterationPath
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm flex-fill" @onclick="() => ViewWorkItemDetails(workItem)">
+                                    <i class="oi oi-eye"></i> View Details
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm flex-fill" @onclick="() => EditWorkItem(workItem)">
+                                    <i class="oi oi-pencil"></i> Edit
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => OpenInAzureDevOps(workItem.Id)">
+                                    <i class="oi oi-external-link"></i> Open in Azure DevOps
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="alert alert-info">
+                    <i class="oi oi-info display-4 text-info mb-3"></i>
+                    <h4>No work items found</h4>
+                    <p class="mb-0">@(string.IsNullOrEmpty(searchTerm) && string.IsNullOrEmpty(typeFilter) && string.IsNullOrEmpty(stateFilter) ? "No work items are available at the moment." : "No work items match your current filters.")</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<WorkItem>? workItems;
+    private List<WorkItem>? filteredWorkItems;
+    private bool isLoading = true;
+    private string searchTerm = string.Empty;
+    private string typeFilter = string.Empty;
+    private string stateFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkItems();
+    }
+
+    private async Task LoadWorkItems()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(500);
+            
+            workItems = new List<WorkItem>
+            {
+                new()
+                {
+                    Id = "WI-001",
+                    Title = "Implement Dashboard UI Components",
+                    Description = "Create reusable Blazor components for the dashboard including project cards, pipeline status indicators, and work item summaries. Ensure responsive design and accessibility compliance.",
+                    Type = "Task",
+                    State = "Active",
+                    Priority = "High",
+                    AssignedTo = "developer@company.com",
+                    CreatedDate = DateTime.UtcNow.AddDays(-3),
+                    ChangedDate = DateTime.UtcNow.AddHours(-2),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    AreaPath = "Platform\\UI",
+                    IterationPath = "Sprint 1",
+                    Tags = new List<string> { "UI", "Blazor", "Dashboard", "Frontend" }
+                },
+                new()
+                {
+                    Id = "WI-002",
+                    Title = "Fix Authentication Token Refresh Issue",
+                    Description = "Users are experiencing authentication token expiration issues. Implement proper token refresh mechanism and handle edge cases gracefully.",
+                    Type = "Bug",
+                    State = "Active",
+                    Priority = "Critical",
+                    AssignedTo = "security@company.com",
+                    CreatedDate = DateTime.UtcNow.AddDays(-1),
+                    ChangedDate = DateTime.UtcNow.AddHours(-6),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    AreaPath = "Platform\\Security",
+                    IterationPath = "Sprint 1",
+                    Tags = new List<string> { "Security", "Authentication", "Bug", "Critical" }
+                },
+                new()
+                {
+                    Id = "WI-003",
+                    Title = "Design AI Code Review Interface",
+                    Description = "Create user interface for AI-powered code review feature. Include code submission form, review results display, and integration with Azure OpenAI Service.",
+                    Type = "User Story",
+                    State = "New",
+                    Priority = "Medium",
+                    AssignedTo = "designer@company.com",
+                    CreatedDate = DateTime.UtcNow.AddDays(-2),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    AreaPath = "Platform\\AI",
+                    IterationPath = "Sprint 2",
+                    Tags = new List<string> { "AI", "Design", "Code Review", "UX" }
+                }
+            };
+
+            filteredWorkItems = workItems;
+        }
+        catch (Exception ex)
+        {
+            // Handle errors appropriately
+            Console.WriteLine($"Error loading work items: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshWorkItems()
+    {
+        await LoadWorkItems();
+    }
+
+    private void HandleSearch()
+    {
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (workItems == null) return;
+
+        var filtered = workItems.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filtered = filtered.Where(w => 
+                w.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                w.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                w.ProjectName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                w.AssignedTo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(typeFilter))
+        {
+            filtered = filtered.Where(w => w.Type.Equals(typeFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(stateFilter))
+        {
+            filtered = filtered.Where(w => w.State.Equals(stateFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filteredWorkItems = filtered.ToList();
+    }
+
+    private string GetTypeBadgeClass(string type)
+    {
+        return type.ToLower() switch
+        {
+            "bug" => "bg-danger",
+            "task" => "bg-primary",
+            "user story" => "bg-success",
+            "feature" => "bg-info",
+            "epic" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStateBadgeClass(string state)
+    {
+        return state.ToLower() switch
+        {
+            "new" => "bg-secondary",
+            "active" => "bg-primary",
+            "resolved" => "bg-warning",
+            "closed" => "bg-success",
+            "removed" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetPriorityBadgeClass(string priority)
+    {
+        return priority.ToLower() switch
+        {
+            "critical" => "bg-danger",
+            "high" => "bg-warning",
+            "medium" => "bg-info",
+            "low" => "bg-success",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void ViewWorkItemDetails(WorkItem workItem)
+    {
+        // Navigate to work item details page
+        // NavigationManager.NavigateTo($"/workitems/{workItem.Id}");
+    }
+
+    private void EditWorkItem(WorkItem workItem)
+    {
+        // Open work item edit modal or navigate to edit page
+        // NavigationManager.NavigateTo($"/workitems/{workItem.Id}/edit");
+    }
+
+    private async Task OpenInAzureDevOps(string workItemId)
+    {
+        // Construct Azure DevOps URL for the work item
+        var url = $"https://dev.azure.com/your-org/your-project/_workitems/edit/{workItemId}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+}

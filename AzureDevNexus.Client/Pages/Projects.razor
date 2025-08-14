@@ -1,0 +1,218 @@
+@page "/projects"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - Projects</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2">Projects</h1>
+                <div class="d-flex gap-2">
+                    <div class="input-group" style="width: 300px;">
+                        <span class="input-group-text">
+                            <i class="oi oi-magnifying-glass"></i>
+                        </span>
+                        <input type="text" class="form-control" placeholder="Search projects..." 
+                               @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="RefreshProjects">
+                        <i class="oi oi-reload"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    }
+    else if (filteredProjects != null && filteredProjects.Any())
+    {
+        <div class="row">
+            @foreach (var project in filteredProjects)
+            {
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100 project-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">@project.Name</h5>
+                            <span class="badge @GetStatusBadgeClass(project.State)">@project.State</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted">@project.Description</p>
+                            
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <div class="border-end">
+                                        <h6 class="text-primary mb-0">@project.RepositoryCount</h6>
+                                        <small class="text-muted">Repos</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border-end">
+                                        <h6 class="text-success mb-0">@project.PipelineCount</h6>
+                                        <small class="text-muted">Pipelines</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <h6 class="text-warning mb-0">@project.WorkItemCount</h6>
+                                    <small class="text-muted">Work Items</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="oi oi-people"></i> @project.DefaultTeam.Name
+                                </small>
+                                <small class="text-muted">
+                                    Updated @project.LastUpdateTime.ToString("MMM dd, yyyy")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm flex-fill" @onclick="() => ViewProjectDetails(project)">
+                                    <i class="oi oi-eye"></i> View Details
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => OpenInAzureDevOps(project.Url)">
+                                    <i class="oi oi-external-link"></i> Open in Azure DevOps
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="alert alert-info">
+                    <i class="oi oi-info display-4 text-info mb-3"></i>
+                    <h4>No projects found</h4>
+                    <p class="mb-0">@(string.IsNullOrEmpty(searchTerm) ? "No projects are available at the moment." : $"No projects match your search for '{searchTerm}'.")</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Project>? projects;
+    private List<Project>? filteredProjects;
+    private bool isLoading = true;
+    private string searchTerm = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjects();
+    }
+
+    private async Task LoadProjects()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(500);
+            
+            projects = new List<Project>
+            {
+                new()
+                {
+                    Id = "proj-001",
+                    Name = "AzureDevNexus",
+                    Description = "Intelligent Azure DevOps management platform with AI-powered features and real-time collaboration.",
+                    State = "Active",
+                    Visibility = "Private",
+                    LastUpdateTime = DateTime.UtcNow.AddHours(-2),
+                    DefaultTeam = new Team { Id = "team-001", Name = "Platform Team", Description = "Core platform development team" },
+                    RepositoryCount = 3,
+                    PipelineCount = 5,
+                    WorkItemCount = 15
+                },
+                new()
+                {
+                    Id = "proj-002",
+                    Name = "E-Commerce Platform",
+                    Description = "Modern e-commerce solution built with .NET and Azure services.",
+                    State = "Active",
+                    Visibility = "Private",
+                    LastUpdateTime = DateTime.UtcNow.AddDays(-1),
+                    DefaultTeam = new Team { Id = "team-002", Name = "E-Commerce Team", Description = "E-commerce platform development team" },
+                    RepositoryCount = 2,
+                    PipelineCount = 3,
+                    WorkItemCount = 8
+                }
+            };
+
+            filteredProjects = projects;
+        }
+        catch (Exception ex)
+        {
+            // Handle errors appropriately
+            Console.WriteLine($"Error loading projects: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshProjects()
+    {
+        await LoadProjects();
+    }
+
+    private void HandleSearch()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredProjects = projects;
+        }
+        else
+        {
+            filteredProjects = projects?.Where(p => 
+                p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                p.DefaultTeam.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+        }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "active" => "bg-success",
+            "inactive" => "bg-secondary",
+            "archived" => "bg-warning",
+            _ => "bg-primary"
+        };
+    }
+
+    private void ViewProjectDetails(Project project)
+    {
+        // Navigate to project details page
+        // NavigationManager.NavigateTo($"/projects/{project.Id}");
+    }
+
+    private async Task OpenInAzureDevOps(string url)
+    {
+        if (!string.IsNullOrEmpty(url))
+        {
+            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        }
+    }
+}

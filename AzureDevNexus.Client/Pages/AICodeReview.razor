@@ -1,0 +1,358 @@
+@page "/ai-codereview"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - AI Code Review</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h2">AI Code Review</h1>
+            <p class="lead">Leverage Azure OpenAI to get intelligent code reviews and improve code quality</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Submit Code for Review</h5>
+                </div>
+                <div class="card-body">
+                    <form @onsubmit="SubmitCodeReview">
+                        <div class="mb-3">
+                            <label for="language" class="form-label">Programming Language</label>
+                            <select id="language" class="form-select" @bind="reviewRequest.Language">
+                                <option value="">Select Language</option>
+                                <option value="C#">C#</option>
+                                <option value="JavaScript">JavaScript</option>
+                                <option value="TypeScript">TypeScript</option>
+                                <option value="Python">Python</option>
+                                <option value="Java">Java</option>
+                                <option value="Go">Go</option>
+                                <option value="Rust">Rust</option>
+                                <option value="PHP">PHP</option>
+                                <option value="Ruby">Ruby</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="reviewType" class="form-label">Review Type</label>
+                            <select id="reviewType" class="form-select" @bind="reviewRequest.ReviewType">
+                                <option value="general">General Code Review</option>
+                                <option value="security">Security Focus</option>
+                                <option value="performance">Performance Focus</option>
+                                <option value="best-practices">Best Practices</option>
+                                <option value="accessibility">Accessibility</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="context" class="form-label">Context (Optional)</label>
+                            <textarea id="context" class="form-control" rows="3" 
+                                      placeholder="Provide additional context about your code, requirements, or specific concerns..."
+                                      @bind="reviewRequest.Context"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="codeSnippet" class="form-label">Code Snippet</label>
+                            <textarea id="codeSnippet" class="form-control" rows="15" 
+                                      placeholder="Paste your code here for AI review..."
+                                      @bind="reviewRequest.CodeSnippet" required></textarea>
+                            <div class="form-text">The AI will analyze your code for issues, suggestions, and improvements.</div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Analyzing Code...</span>
+                                }
+                                else
+                                {
+                                    <i class="oi oi-brain me-2"></i>
+                                    <span>Submit for AI Review</span>
+                                }
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            @if (codeReviewResponse != null)
+            {
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">AI Review Results</h5>
+                        <small class="text-muted">@codeReviewResponse.ReviewDate.ToString("MMM dd, HH:mm")</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <h6>Quality Score</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="me-3">
+                                    <span class="h2 @GetGradeColor(codeReviewResponse.QualityScore.Grade)">
+                                        @codeReviewResponse.QualityScore.Grade
+                                    </span>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="progress mb-2" style="height: 8px;">
+                                        <div class="progress-bar" style="width: @(codeReviewResponse.QualityScore.OverallScore)%"></div>
+                                    </div>
+                                    <small class="text-muted">Overall Score: @codeReviewResponse.QualityScore.OverallScore/100</small>
+                                </div>
+                            </div>
+                            
+                            <div class="row text-center">
+                                <div class="col-3">
+                                    <small class="text-muted d-block">Readability</small>
+                                    <span class="fw-bold">@codeReviewResponse.QualityScore.ReadabilityScore</span>
+                                </div>
+                                <div class="col-3">
+                                    <small class="text-muted d-block">Maintainability</small>
+                                    <span class="fw-bold">@codeReviewResponse.QualityScore.MaintainabilityScore</span>
+                                </div>
+                                <div class="col-3">
+                                    <small class="text-muted d-block">Performance</small>
+                                    <span class="fw-bold">@codeReviewResponse.QualityScore.PerformanceScore</span>
+                                </div>
+                                <div class="col-3">
+                                    <small class="text-muted d-block">Security</small>
+                                    <span class="fw-bold">@codeReviewResponse.QualityScore.SecurityScore</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>Summary</h6>
+                            <p class="text-muted">@codeReviewResponse.Summary</p>
+                        </div>
+
+                        @if (codeReviewResponse.Issues.Any())
+                        {
+                            <div class="mb-4">
+                                <h6>Issues Found (@codeReviewResponse.Issues.Count)</h6>
+                                <div class="accordion" id="issuesAccordion">
+                                    @for (int i = 0; i < codeReviewResponse.Issues.Count; i++)
+                                    {
+                                        var issue = codeReviewResponse.Issues[i];
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button @(i == 0 ? "" : "collapsed")" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#issue-@i">
+                                                    <span class="badge @GetIssueBadgeClass(issue.Severity) me-2">@issue.Severity</span>
+                                                    <span class="badge @GetIssueTypeBadgeClass(issue.Type) me-2">@issue.Type</span>
+                                                    @issue.Message
+                                                </button>
+                                            </h2>
+                                            <div id="issue-@i" class="accordion-collapse collapse @(i == 0 ? "show" : "")" 
+                                                 data-bs-parent="#issuesAccordion">
+                                                <div class="accordion-body">
+                                                    <p><strong>Description:</strong> @issue.Description</p>
+                                                    @if (!string.IsNullOrEmpty(issue.Code))
+                                                    {
+                                                        <p><strong>Code:</strong></p>
+                                                        <pre class="bg-light p-2 rounded"><code>@issue.Code</code></pre>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(issue.Fix))
+                                                    {
+                                                        <p><strong>Suggested Fix:</strong></p>
+                                                        <pre class="bg-light p-2 rounded"><code>@issue.Fix</code></pre>
+                                                    }
+                                                    <small class="text-muted">Line @issue.LineNumber, Column @issue.ColumnNumber</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (codeReviewResponse.Suggestions.Any())
+                        {
+                            <div class="mb-4">
+                                <h6>Suggestions (@codeReviewResponse.Suggestions.Count)</h6>
+                                <div class="accordion" id="suggestionsAccordion">
+                                    @for (int i = 0; i < codeReviewResponse.Suggestions.Count; i++)
+                                    {
+                                        var suggestion = codeReviewResponse.Suggestions[i];
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#suggestion-@i">
+                                                    <span class="badge @GetSuggestionBadgeClass(suggestion.Type) me-2">@suggestion.Type</span>
+                                                    @suggestion.Title
+                                                    <span class="badge bg-secondary ms-auto">@(suggestion.Confidence * 100)%</span>
+                                                </button>
+                                            </h2>
+                                            <div id="suggestion-@i" class="accordion-collapse collapse" 
+                                                 data-bs-parent="#suggestionsAccordion">
+                                                <div class="accordion-body">
+                                                    <p><strong>Description:</strong> @suggestion.Description</p>
+                                                    <p><strong>Reasoning:</strong> @suggestion.Reasoning</p>
+                                                    @if (!string.IsNullOrEmpty(suggestion.SuggestedCode))
+                                                    {
+                                                        <p><strong>Suggested Code:</strong></p>
+                                                        <pre class="bg-light p-2 rounded"><code>@suggestion.SuggestedCode</code></pre>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="text-muted">
+                            <small>
+                                <i class="oi oi-info"></i> 
+                                Review completed in @codeReviewResponse.ProcessingTime.TotalSeconds:F1 seconds using @codeReviewResponse.ModelUsed
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="oi oi-brain display-1 text-muted mb-3"></i>
+                        <h5>Ready for Code Review</h5>
+                        <p class="text-muted">Submit your code on the left to get AI-powered analysis and suggestions.</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private CodeReviewRequest reviewRequest = new();
+    private CodeReviewResponse? codeReviewResponse;
+    private bool isSubmitting = false;
+
+    private async Task SubmitCodeReview()
+    {
+        if (string.IsNullOrWhiteSpace(reviewRequest.CodeSnippet) || string.IsNullOrWhiteSpace(reviewRequest.Language))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please provide both code snippet and programming language.");
+            return;
+        }
+
+        try
+        {
+            isSubmitting = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(2000);
+            
+            // Generate mock response
+            codeReviewResponse = new CodeReviewResponse
+            {
+                ReviewId = Guid.NewGuid().ToString(),
+                Summary = "Your code shows good structure and follows most best practices. There are a few areas for improvement in error handling and performance optimization.",
+                ReviewDate = DateTime.UtcNow,
+                ModelUsed = "GPT-4",
+                ProcessingTime = TimeSpan.FromSeconds(2.3),
+                QualityScore = new CodeQualityScore
+                {
+                    OverallScore = 78,
+                    ReadabilityScore = 85,
+                    MaintainabilityScore = 80,
+                    PerformanceScore = 70,
+                    SecurityScore = 75,
+                    Grade = "B+",
+                    Strengths = new List<string> { "Clear variable naming", "Consistent formatting", "Good separation of concerns" },
+                    AreasForImprovement = new List<string> { "Error handling could be more robust", "Consider caching for performance", "Add input validation" }
+                },
+                Issues = new List<CodeIssue>
+                {
+                    new()
+                    {
+                        Id = "issue-1",
+                        Type = "warning",
+                        Severity = "medium",
+                        Message = "Missing null check",
+                        Description = "The method parameter should be validated for null before use to prevent potential runtime exceptions.",
+                        LineNumber = 15,
+                        ColumnNumber = 5,
+                        Code = "public void ProcessData(string data) { var result = data.Length; }",
+                        Fix = "public void ProcessData(string data) { if (data != null) { var result = data.Length; } }"
+                    }
+                },
+                Suggestions = new List<CodeSuggestion>
+                {
+                    new()
+                    {
+                        Id = "suggestion-1",
+                        Type = "improvement",
+                        Title = "Use string interpolation",
+                        Description = "Consider using string interpolation instead of string concatenation for better readability and performance.",
+                        Code = "var message = \"Hello \" + name + \"!\";",
+                        SuggestedCode = "var message = $\"Hello {name}!\";",
+                        Reasoning = "String interpolation is more readable and performs better than concatenation.",
+                        Confidence = 0.95
+                    }
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error submitting code review: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private string GetGradeColor(string grade)
+    {
+        return grade switch
+        {
+            "A" => "text-success",
+            "B" => "text-primary",
+            "C" => "text-warning",
+            "D" => "text-danger",
+            "F" => "text-danger",
+            _ => "text-secondary"
+        };
+    }
+
+    private string GetIssueBadgeClass(string severity)
+    {
+        return severity.ToLower() switch
+        {
+            "high" => "bg-danger",
+            "medium" => "bg-warning",
+            "low" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetIssueTypeBadgeClass(string type)
+    {
+        return type.ToLower() switch
+        {
+            "error" => "bg-danger",
+            "warning" => "bg-warning",
+            "info" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetSuggestionBadgeClass(string type)
+    {
+        return type.ToLower() switch
+        {
+            "improvement" => "bg-success",
+            "refactoring" => "bg-primary",
+            "optimization" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+}

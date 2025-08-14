@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\AzureDevNexus.Server.props" />
+</Project>

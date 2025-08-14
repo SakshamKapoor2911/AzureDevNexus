@@ -1,0 +1,303 @@
+@page "/pipelines"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - Pipelines</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2">Pipelines</h1>
+                <div class="d-flex gap-2">
+                    <div class="input-group" style="width: 300px;">
+                        <span class="input-group-text">
+                            <i class="oi oi-magnifying-glass"></i>
+                        </span>
+                        <input type="text" class="form-control" placeholder="Search pipelines..." 
+                               @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    </div>
+                    <select class="form-select" style="width: 150px;" @bind="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="Running">Running</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Queued">Queued</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="RefreshPipelines">
+                        <i class="oi oi-reload"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    }
+    else if (filteredPipelines != null && filteredPipelines.Any())
+    {
+        <div class="row">
+            @foreach (var pipeline in filteredPipelines)
+            {
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 pipeline-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0">@pipeline.Name</h5>
+                                <small class="text-muted">@pipeline.ProjectName</small>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge @GetPipelineTypeBadgeClass(pipeline.Type)">@pipeline.Type</span>
+                                <span class="badge @GetStatusBadgeClass(pipeline.Status)">@pipeline.Status</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted">Last Run:</small>
+                                    <div class="fw-bold">@pipeline.LastRunDate.ToString("MMM dd, HH:mm")</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Last Result:</small>
+                                    <div class="fw-bold @GetResultTextClass(pipeline.LastRunResult)">@pipeline.LastRunResult</div>
+                                </div>
+                            </div>
+
+                            @if (pipeline.RecentRuns.Any())
+                            {
+                                <div class="mb-3">
+                                    <small class="text-muted">Recent Runs:</small>
+                                    <div class="d-flex gap-1 mt-1">
+                                        @foreach (var run in pipeline.RecentRuns.Take(5))
+                                        {
+                                            <div class="pipeline-run-indicator @GetRunIndicatorClass(run.Result)" 
+                                                 title="@run.Name - @run.Result (@run.StartTime.ToString("MMM dd"))">
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="oi oi-clock"></i> @pipeline.LastRunDate.ToString("MMM dd, yyyy")
+                                </small>
+                                <small class="text-muted">
+                                    <i class="oi oi-person"></i> @(pipeline.RecentRuns.FirstOrDefault()?.TriggeredBy ?? "System")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm flex-fill" @onclick="() => ViewPipelineDetails(pipeline)">
+                                    <i class="oi oi-eye"></i> View Details
+                                </button>
+                                <button class="btn btn-outline-success btn-sm flex-fill" @onclick="() => TriggerPipeline(pipeline)">
+                                    <i class="oi oi-play"></i> Trigger Run
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => OpenInAzureDevOps(pipeline.Url)">
+                                    <i class="oi oi-external-link"></i> Open in Azure DevOps
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="alert alert-info">
+                    <i class="oi oi-info display-4 text-info mb-3"></i>
+                    <h4>No pipelines found</h4>
+                    <p class="mb-0">@(string.IsNullOrEmpty(searchTerm) && string.IsNullOrEmpty(statusFilter) ? "No pipelines are available at the moment." : "No pipelines match your current filters.")</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Pipeline>? pipelines;
+    private List<Pipeline>? filteredPipelines;
+    private bool isLoading = true;
+    private string searchTerm = string.Empty;
+    private string statusFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPipelines();
+    }
+
+    private async Task LoadPipelines()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(500);
+            
+            pipelines = new List<Pipeline>
+            {
+                new()
+                {
+                    Id = "pipe-001",
+                    Name = "Build Pipeline",
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Type = "Build",
+                    Status = "Completed",
+                    LastRunDate = DateTime.UtcNow.AddHours(-1),
+                    LastRunStatus = "Completed",
+                    LastRunResult = "Succeeded",
+                    Url = "#",
+                    RecentRuns = new List<PipelineRun>
+                    {
+                        new() { Id = "run-001", Name = "Build #123", Status = "Completed", Result = "Succeeded", StartTime = DateTime.UtcNow.AddHours(-1), FinishTime = DateTime.UtcNow.AddMinutes(-30), TriggeredBy = "developer@company.com", SourceBranch = "main", SourceVersion = "abc123" },
+                        new() { Id = "run-002", Name = "Build #122", Status = "Completed", Result = "Succeeded", StartTime = DateTime.UtcNow.AddHours(-3), FinishTime = DateTime.UtcNow.AddHours(-2), TriggeredBy = "developer@company.com", SourceBranch = "feature/new-ui", SourceVersion = "def456" },
+                        new() { Id = "run-003", Name = "Build #121", Status = "Completed", Result = "Failed", StartTime = DateTime.UtcNow.AddHours(-5), FinishTime = DateTime.UtcNow.AddHours(-4), TriggeredBy = "developer@company.com", SourceBranch = "main", SourceVersion = "ghi789" }
+                    }
+                },
+                new()
+                {
+                    Id = "pipe-002",
+                    Name = "Deploy Pipeline",
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Type = "Release",
+                    Status = "Running",
+                    LastRunDate = DateTime.UtcNow.AddMinutes(-30),
+                    LastRunStatus = "Running",
+                    LastRunResult = "Running",
+                    Url = "#",
+                    RecentRuns = new List<PipelineRun>
+                    {
+                        new() { Id = "run-004", Name = "Deploy #45", Status = "Running", Result = "Running", StartTime = DateTime.UtcNow.AddMinutes(-30), TriggeredBy = "system", SourceBranch = "main", SourceVersion = "abc123" },
+                        new() { Id = "run-005", Name = "Deploy #44", Status = "Completed", Result = "Succeeded", StartTime = DateTime.UtcNow.AddHours(-2), FinishTime = DateTime.UtcNow.AddHours(-1), TriggeredBy = "system", SourceBranch = "main", SourceVersion = "def456" }
+                    }
+                }
+            };
+
+            filteredPipelines = pipelines;
+        }
+        catch (Exception ex)
+        {
+            // Handle errors appropriately
+            Console.WriteLine($"Error loading pipelines: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshPipelines()
+    {
+        await LoadPipelines();
+    }
+
+    private void HandleSearch()
+    {
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (pipelines == null) return;
+
+        var filtered = pipelines.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filtered = filtered.Where(p => 
+                p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                p.ProjectName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            filtered = filtered.Where(p => p.Status.Equals(statusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filteredPipelines = filtered.ToList();
+    }
+
+    private string GetPipelineTypeBadgeClass(string type)
+    {
+        return type.ToLower() switch
+        {
+            "build" => "bg-primary",
+            "release" => "bg-success",
+            "yaml" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "running" => "bg-warning",
+            "completed" => "bg-success",
+            "failed" => "bg-danger",
+            "queued" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetResultTextClass(string result)
+    {
+        return result.ToLower() switch
+        {
+            "succeeded" => "text-success",
+            "failed" => "text-danger",
+            "running" => "text-warning",
+            _ => "text-secondary"
+        };
+    }
+
+    private string GetRunIndicatorClass(string result)
+    {
+        return result.ToLower() switch
+        {
+            "succeeded" => "bg-success",
+            "failed" => "bg-danger",
+            "running" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void ViewPipelineDetails(Pipeline pipeline)
+    {
+        // Navigate to pipeline details page
+        // NavigationManager.NavigateTo($"/pipelines/{pipeline.Id}");
+    }
+
+    private async Task TriggerPipeline(Pipeline pipeline)
+    {
+        // Trigger pipeline run
+        // await Http.PostAsync($"/api/pipelines/{pipeline.Id}/trigger", null);
+        await JSRuntime.InvokeVoidAsync("alert", $"Triggering pipeline: {pipeline.Name}");
+    }
+
+    private async Task OpenInAzureDevOps(string url)
+    {
+        if (!string.IsNullOrEmpty(url))
+        {
+            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        }
+    }
+}

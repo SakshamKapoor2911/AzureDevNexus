@@ -1,7 +1,174 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>AzureDevNexus - Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 text-center mb-4">Welcome to AzureDevNexus</h1>
+            <p class="lead text-center mb-5">Your intelligent Azure DevOps management platform</p>
+        </div>
+    </div>
 
-Welcome to your new app.
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="oi oi-briefcase display-1 text-primary mb-3"></i>
+                    <h5 class="card-title">Project Management</h5>
+                    <p class="card-text">Manage your Azure DevOps projects with ease. Track progress, monitor status, and collaborate with your team.</p>
+                    <a href="projects" class="btn btn-primary">View Projects</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="oi oi-graph display-1 text-success mb-3"></i>
+                    <h5 class="card-title">Pipeline Monitoring</h5>
+                    <p class="card-text">Monitor your CI/CD pipelines in real-time. Track builds, deployments, and get instant notifications.</p>
+                    <a href="pipelines" class="btn btn-success">View Pipelines</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="oi oi-brain display-1 text-info mb-3"></i>
+                    <h5 class="card-title">AI Code Review</h5>
+                    <p class="card-text">Leverage Azure OpenAI to get intelligent code reviews. Improve code quality and catch issues early.</p>
+                    <a href="ai-codereview" class="btn btn-info">Try AI Review</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Quick Stats</h4>
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h3 class="text-primary">@(projectsCount ?? 0)</h3>
+                                <p class="text-muted">Active Projects</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h3 class="text-success">@(pipelinesCount ?? 0)</h3>
+                                <p class="text-muted">Total Pipelines</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h3 class="text-warning">@(workItemsCount ?? 0)</h3>
+                                <p class="text-muted">Open Work Items</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-info">@(repositoriesCount ?? 0)</h3>
+                            <p class="text-muted">Repositories</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Recent Activity</h4>
+                    @if (recentActivities != null && recentActivities.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var activity in recentActivities.Take(5))
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>@activity.Title</strong>
+                                        <small class="text-muted d-block">@activity.Description</small>
+                                    </div>
+                                    <small class="text-muted">@activity.Timestamp.ToString("MMM dd, HH:mm")</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No recent activity to display.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int? projectsCount;
+    private int? pipelinesCount;
+    private int? workItemsCount;
+    private int? repositoriesCount;
+    private List<AzureDevNexus.Shared.Models.RecentActivity>? recentActivities;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // In a real application, you would fetch this data from the API
+        // For now, we'll use placeholder values
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Simulate API calls
+            await Task.Delay(100);
+            
+            projectsCount = 2;
+            pipelinesCount = 5;
+            workItemsCount = 15;
+            repositoriesCount = 3;
+
+            recentActivities = new List<AzureDevNexus.Shared.Models.RecentActivity>
+            {
+                new()
+                {
+                    Id = "1",
+                    Type = "WorkItem",
+                    Title = "Dashboard UI Implementation",
+                    Description = "Work item updated to Active",
+                    User = "developer@company.com",
+                    Timestamp = DateTime.UtcNow.AddHours(-2),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Status = "Active",
+                    Url = "#"
+                },
+                new()
+                {
+                    Id = "2",
+                    Type = "PipelineRun",
+                    Title = "Build Pipeline",
+                    Description = "Pipeline run completed successfully",
+                    User = "system",
+                    Timestamp = DateTime.UtcNow.AddHours(-4),
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Status = "Completed",
+                    Url = "#"
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            // Handle errors appropriately
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+    }
+}

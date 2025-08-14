@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "a0rx0NUx9LmOIEM1PLaR98Q7Oc4x3Dpgyg8a8CAaIuw=",
+  "Source": "AzureDevNexus.Server",
+  "BasePath": "_content/AzureDevNexus.Server",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}

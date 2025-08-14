@@ -1,0 +1,323 @@
+@page "/repositories"
+@using AzureDevNexus.Shared.Models
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AzureDevNexus - Repositories</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2">Repositories</h1>
+                <div class="d-flex gap-2">
+                    <div class="input-group" style="width: 300px;">
+                        <span class="input-group-text">
+                            <i class="oi oi-magnifying-glass"></i>
+                        </span>
+                        <input type="text" class="form-control" placeholder="Search repositories..." 
+                               @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    </div>
+                    <select class="form-select" style="width: 150px;" @bind="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="Git">Git</option>
+                        <option value="TFVC">TFVC</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="RefreshRepositories">
+                        <i class="oi oi-reload"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    }
+    else if (filteredRepositories != null && filteredRepositories.Any())
+    {
+        <div class="row">
+            @foreach (var repository in filteredRepositories)
+            {
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 repository-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0">@repository.Name</h5>
+                                <small class="text-muted">@repository.ProjectName</small>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge @GetTypeBadgeClass(repository.Type)">@repository.Type</span>
+                                @if (repository.IsFork)
+                                {
+                                    <span class="badge bg-info">Fork</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-4">
+                                    <small class="text-muted">Default Branch:</small>
+                                    <div class="fw-bold">@repository.DefaultBranch</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Commits:</small>
+                                    <div class="fw-bold">@repository.CommitCount</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Branches:</small>
+                                    <div class="fw-bold">@repository.BranchCount</div>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted">Pull Requests:</small>
+                                    <div class="fw-bold">@repository.PullRequestCount</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Last Updated:</small>
+                                    <div class="fw-bold">@repository.LastUpdatedDate.ToString("MMM dd, yyyy")</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <small class="text-muted">Permissions:</small>
+                                <div class="d-flex gap-2 mt-1">
+                                    @if (repository.Permissions.CanRead)
+                                    {
+                                        <span class="badge bg-success">Read</span>
+                                    }
+                                    @if (repository.Permissions.CanWrite)
+                                    {
+                                        <span class="badge bg-warning">Write</span>
+                                    }
+                                    @if (repository.Permissions.CanDelete)
+                                    {
+                                        <span class="badge bg-danger">Delete</span>
+                                    }
+                                    @if (repository.Permissions.CanManage)
+                                    {
+                                        <span class="badge bg-info">Manage</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="oi oi-calendar"></i> Created @repository.CreatedDate.ToString("MMM dd, yyyy")
+                                </small>
+                                <small class="text-muted">
+                                    <i class="oi oi-clock"></i> Updated @repository.LastUpdatedDate.ToString("MMM dd, HH:mm")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm flex-fill" @onclick="() => ViewRepositoryDetails(repository)">
+                                    <i class="oi oi-eye"></i> View Details
+                                </button>
+                                <button class="btn btn-outline-success btn-sm flex-fill" @onclick="() => CloneRepository(repository)">
+                                    <i class="oi oi-download"></i> Clone
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => OpenInAzureDevOps(repository.Url)">
+                                    <i class="oi oi-external-link"></i> Open in Azure DevOps
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="alert alert-info">
+                    <i class="oi oi-info display-4 text-info mb-3"></i>
+                    <h4>No repositories found</h4>
+                    <p class="mb-0">@(string.IsNullOrEmpty(searchTerm) && string.IsNullOrEmpty(typeFilter) ? "No repositories are available at the moment." : "No repositories match your current filters.")</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Repository>? repositories;
+    private List<Repository>? filteredRepositories;
+    private bool isLoading = true;
+    private string searchTerm = string.Empty;
+    private string typeFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRepositories();
+    }
+
+    private async Task LoadRepositories()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Simulate API call - replace with actual API call
+            await Task.Delay(500);
+            
+            repositories = new List<Repository>
+            {
+                new()
+                {
+                    Id = "repo-001",
+                    Name = "AzureDevNexus",
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Url = "https://dev.azure.com/your-org/AzureDevNexus/_git/AzureDevNexus",
+                    DefaultBranch = "main",
+                    Type = "Git",
+                    IsFork = false,
+                    CreatedDate = DateTime.UtcNow.AddMonths(-2),
+                    LastUpdatedDate = DateTime.UtcNow.AddHours(-3),
+                    CommitCount = 156,
+                    BranchCount = 8,
+                    PullRequestCount = 12,
+                    Permissions = new RepositoryPermissions
+                    {
+                        CanRead = true,
+                        CanWrite = true,
+                        CanDelete = false,
+                        CanManage = false
+                    }
+                },
+                new()
+                {
+                    Id = "repo-002",
+                    Name = "AzureDevNexus-Client",
+                    ProjectId = "proj-001",
+                    ProjectName = "AzureDevNexus",
+                    Url = "https://dev.azure.com/your-org/AzureDevNexus/_git/AzureDevNexus-Client",
+                    DefaultBranch = "main",
+                    Type = "Git",
+                    IsFork = false,
+                    CreatedDate = DateTime.UtcNow.AddMonths(-1),
+                    LastUpdatedDate = DateTime.UtcNow.AddHours(-1),
+                    CommitCount = 89,
+                    BranchCount = 5,
+                    PullRequestCount = 7,
+                    Permissions = new RepositoryPermissions
+                    {
+                        CanRead = true,
+                        CanWrite = true,
+                        CanDelete = false,
+                        CanManage = false
+                    }
+                },
+                new()
+                {
+                    Id = "repo-003",
+                    Name = "Legacy-System",
+                    ProjectId = "proj-002",
+                    ProjectName = "E-Commerce Platform",
+                    Url = "https://dev.azure.com/your-org/E-Commerce/_git/Legacy-System",
+                    DefaultBranch = "master",
+                    Type = "TFVC",
+                    IsFork = false,
+                    CreatedDate = DateTime.UtcNow.AddYears(-1),
+                    LastUpdatedDate = DateTime.UtcNow.AddDays(-2),
+                    CommitCount = 234,
+                    BranchCount = 3,
+                    PullRequestCount = 0,
+                    Permissions = new RepositoryPermissions
+                    {
+                        CanRead = true,
+                        CanWrite = false,
+                        CanDelete = false,
+                        CanManage = false
+                    }
+                }
+            };
+
+            filteredRepositories = repositories;
+        }
+        catch (Exception ex)
+        {
+            // Handle errors appropriately
+            Console.WriteLine($"Error loading repositories: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshRepositories()
+    {
+        await LoadRepositories();
+    }
+
+    private void HandleSearch()
+    {
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (repositories == null) return;
+
+        var filtered = repositories.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filtered = filtered.Where(r => 
+                r.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                r.ProjectName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(typeFilter))
+        {
+            filtered = filtered.Where(r => r.Type.Equals(typeFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filteredRepositories = filtered.ToList();
+    }
+
+    private string GetTypeBadgeClass(string type)
+    {
+        return type.ToLower() switch
+        {
+            "git" => "bg-success",
+            "tfvc" => "bg-primary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void ViewRepositoryDetails(Repository repository)
+    {
+        // Navigate to repository details page
+        // NavigationManager.NavigateTo($"/repositories/{repository.Id}");
+    }
+
+    private async Task CloneRepository(Repository repository)
+    {
+        var cloneUrl = repository.Url.Replace("_git/", "_git/").Replace("https://", "https://username@");
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", cloneUrl);
+        await JSRuntime.InvokeVoidAsync("alert", $"Clone URL copied to clipboard: {cloneUrl}");
+    }
+
+    private async Task OpenInAzureDevOps(string url)
+    {
+        if (!string.IsNullOrEmpty(url))
+        {
+            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        }
+    }
+}

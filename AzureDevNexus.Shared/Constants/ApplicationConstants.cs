@@ -28,7 +28,7 @@ public static class ApplicationConstants
     
     // File Upload
     public const int MaxFileSizeMB = 10;
-    public const string[] AllowedFileExtensions = { ".cs", ".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".hpp" };
+    public static readonly string[] AllowedFileExtensions = { ".cs", ".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".hpp" };
     
     // AI Code Review
     public const int MaxCodeSnippetLength = 10000;
